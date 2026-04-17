@@ -1,0 +1,17 @@
+{
+    "name": "NumMatch.Managers",
+    "rootNamespace": "NumMatch.Managers",
+    "references": [
+        "NumMatch.Core",
+        "NumMatch.UI"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
