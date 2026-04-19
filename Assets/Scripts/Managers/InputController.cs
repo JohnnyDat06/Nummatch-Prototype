@@ -33,6 +33,7 @@ namespace NumMatch.Managers {
         private void HandleCellClicked(CellView view) {
             // Case 1: chưa có cell nào selected → select
             if (_firstSelected == null) {
+                AudioManager.Instance?.Play(SfxType.Choose);
                 _firstSelected = view;
                 view.SetSelected(true);
                 return;
@@ -46,6 +47,7 @@ namespace NumMatch.Managers {
             }
             
             // Case 3: click cell thứ 2 → thử match
+            AudioManager.Instance?.Play(SfxType.Choose);
             Cell a = _firstSelected.GetData();
             Cell b = view.GetData();
             
