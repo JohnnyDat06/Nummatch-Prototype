@@ -79,5 +79,21 @@ namespace NumMatch.Core
             
             return !IsBlocked(b, idxA, idxB);
         }
+
+        public static bool HasAnyMatchablePair(BoardData b)
+        {
+            var unmatched = b.GetUnmatchedCells();
+            for (int i = 0; i < unmatched.Count; i++)
+            {
+                for (int j = i + 1; j < unmatched.Count; j++)
+                {
+                    if (CanMatch(b, unmatched[i].Index, unmatched[j].Index))
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
     }
 }
