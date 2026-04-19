@@ -12,15 +12,8 @@ namespace NumMatch.Managers {
         private List<CellView> _cellViews = new List<CellView>();
 
         private void Start() {
-            int[] tempValues = { 4,6,1,8,2,3,2,9,2, 1,1,8,5,5,1,5,6,4, 8,9,7,2,5,8,6,3,2 };
-            _currentBoard = new BoardData { Columns = 9 };
-            for(int i=0; i<tempValues.Length; i++) {
-                _currentBoard.Cells.Add(new Cell {
-                    Value = tempValues[i],
-                    Index = i,
-                    IsMatched = false
-                });
-            }
+            List<int> tempValues = new List<int> { 4,6,1,8,2,3,2,9,2, 1,1,8,5,5,1,5,6,4, 8,9,7,2,5,8,6,3,2 };
+            _currentBoard = BoardData.CreateFromValues(tempValues, 1);
             RenderBoard(_currentBoard);
         }
 

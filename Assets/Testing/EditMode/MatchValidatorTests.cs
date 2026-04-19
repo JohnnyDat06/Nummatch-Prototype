@@ -7,10 +7,10 @@ namespace NumMatch.Testing.EditMode
     {
         private BoardData CreateBoard(int cellsCount, params int[] matchedIndices)
         {
-            var board = new BoardData { Columns = 9 };
+            var board = BoardData.CreateEmpty(1);
             for (int i = 0; i < cellsCount; i++)
             {
-                board.Cells.Add(new Cell { Index = i, Value = 1, IsMatched = false });
+                board.Cells.Add(new Cell(1, i));
             }
             foreach (var idx in matchedIndices)
             {
