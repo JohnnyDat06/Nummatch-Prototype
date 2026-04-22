@@ -67,7 +67,7 @@ namespace NumMatch.Managers {
             
             if (matched) {
                 OnMatchSuccess?.Invoke(a, b);
-                _firstSelected.SetSelected(false);
+                if(_firstSelected != null) _firstSelected.SetSelected(false);
                 view.SetSelected(false);
                 _firstSelected = null;
             } else {

@@ -372,7 +372,7 @@ MonoBehaviour:
   m_HandleRect: {fileID: 114984991}
   m_Direction: 2
   m_Value: 0
-  m_Size: 0.99999905
+  m_Size: 1
   m_NumberOfSteps: 0
   m_OnValueChanged:
     m_PersistentCalls:
@@ -840,6 +840,12 @@ MonoBehaviour:
   _sfxMappings:
   - Type: 0
     Clip: {fileID: 8300000, guid: a170e0153367ffc47ba7ab2831957000, type: 3}
+  - Type: 1
+    Clip: {fileID: 8300000, guid: 824ea64c5d9dd834ca5178f72839d45f, type: 3}
+  - Type: 2
+    Clip: {fileID: 8300000, guid: 5875b2ec0e9b1b04aae1e8169d83aa1b, type: 3}
+  - Type: 3
+    Clip: {fileID: 8300000, guid: 5a41e593bf9ad024aad0697683123321, type: 3}
 --- !u!4 &1127199618
 Transform:
   m_ObjectHideFlags: 0
