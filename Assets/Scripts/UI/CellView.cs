@@ -3,6 +3,7 @@ using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
 using NumMatch.Core;
+using DG.Tweening;
 
 namespace NumMatch.UI {
     public class CellView : MonoBehaviour {
@@ -12,6 +13,7 @@ namespace NumMatch.UI {
         [SerializeField] private Image _selectHighlight;
         
         private Cell _data;
+        private CanvasGroup _canvasGroup;
         
         public event Action<CellView> OnClicked;
         public bool IsSelected { get; private set; }
@@ -51,5 +53,14 @@ namespace NumMatch.UI {
 
         /// <summary>Trả về data thật của cell này</summary>
         public Cell GetData() => _data;
+
+        public CanvasGroup GetOrAddCanvasGroup() {
+            if (_canvasGroup == null) {
+                _canvasGroup = GetComponent<CanvasGroup>();
+                if (_canvasGroup == null)
+                    _canvasGroup = gameObject.AddComponent<CanvasGroup>();
+            }
+            return _canvasGroup;
+        }
     }
 }

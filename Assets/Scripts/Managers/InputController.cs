@@ -10,6 +10,13 @@ namespace NumMatch.Managers {
         
         public event Action<Cell, Cell> OnMatchSuccess; // để BoardManager xử lý remove
         public event Action<Cell, Cell> OnMatchFailed;  // để SFX/animation feedback
+
+        private bool _inputEnabled = true;
+
+        public void SetInputEnabled(bool enabled) {
+            _inputEnabled = enabled;
+            if (!enabled) ResetSelection();
+        }
         
         public void Init(BoardData boardData) {
             _currentBoard = boardData;
@@ -31,6 +38,8 @@ namespace NumMatch.Managers {
         }
         
         private void HandleCellClicked(CellView view) {
+            if (!_inputEnabled) return;
+
             // Case 1: chưa có cell nào selected → select
             if (_firstSelected == null) {
                 AudioManager.Instance?.Play(SfxType.Choose);

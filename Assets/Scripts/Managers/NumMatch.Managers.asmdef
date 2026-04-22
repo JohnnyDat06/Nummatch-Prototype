@@ -3,7 +3,8 @@
     "rootNamespace": "NumMatch.Managers",
     "references": [
         "NumMatch.Core",
-        "NumMatch.UI"
+        "NumMatch.UI",
+        "DOTween.Modules"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
