@@ -4,6 +4,7 @@
     "references": [
         "NumMatch.Core",
         "NumMatch.UI",
+        "Unity.TextMeshPro",
         "DOTween.Modules"
     ],
     "includePlatforms": [],

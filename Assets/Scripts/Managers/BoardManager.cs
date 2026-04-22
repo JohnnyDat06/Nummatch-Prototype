@@ -170,7 +170,8 @@ namespace NumMatch.Managers {
             ScrollToTop();
         }
 
-        public void AddNumbers() {
+        public void OnAddPressed() {
+            AudioManager.Instance?.Play(SfxType.PopButton);
             if (_currentBoard.AddsRemaining <= 0) return;
             
             var unmatchedValues = _currentBoard.GetUnmatchedCells()
