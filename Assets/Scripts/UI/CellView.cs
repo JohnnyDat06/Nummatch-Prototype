@@ -27,10 +27,15 @@ namespace NumMatch.UI {
         /// <summary>Khởi tạo hiển thị của cell dựa trên data</summary>
         public void Bind(Cell cell) {
             _data = cell;
-            _valueText.text = cell.IsMatched ? "" : cell.Value.ToString();
+            // Luôn hiển thị số, không ẩn text khi matched
+            _valueText.text = cell.Value.ToString();
             SetSelected(false);
             SetInteractable(!cell.IsMatched);
             gameObject.SetActive(true);
+            
+            // Xử lý độ mờ: nếu đã match thì mờ đi một phần (ví dụ 0.3), chưa match thì về 1.0
+            var cg = GetOrAddCanvasGroup();
+            cg.alpha = cell.IsMatched ? 0.3f : 1f;
         }
         
         public void SetSelected(bool selected) {

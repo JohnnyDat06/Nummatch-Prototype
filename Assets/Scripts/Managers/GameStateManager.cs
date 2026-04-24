@@ -1,4 +1,5 @@
 using UnityEngine;
+using NumMatch.Core;
 
 namespace NumMatch.Managers
 {
@@ -23,6 +24,31 @@ namespace NumMatch.Managers
             AudioManager.Instance?.Play(SfxType.PopButton);
             Debug.Log("GoHome called!");
             // TODO: Implement actual GoHome logic when needed (e.g., SceneManager.LoadScene("HomeScene"))
+        }
+
+        public void OnBoardStateChanged(BoardData board, BoardManager boardManager, UIController uiController)
+        {
+            if (board.IsBoardAllMatched())
+            {
+                if (!board.IsAllGemsCollected())
+                {
+                    // Transition to next stage
+                    board.Stage++;
+                    board.AddsRemaining = 6; // DEFAULT_ADDS
+                    
+                    boardManager.GenerateNewStage(board.Stage);
+                    
+                    uiController?.SetStage(board.Stage);
+                    uiController?.SetAddsRemaining(board.AddsRemaining);
+                    boardManager.ScrollToTopPublic();
+                    
+                    Debug.Log($"Transitioned to Stage {board.Stage}");
+                }
+                else
+                {
+                    uiController?.ShowWinPopup();
+                }
+            }
         }
     }
 }

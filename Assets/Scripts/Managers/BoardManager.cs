@@ -25,9 +25,12 @@ namespace NumMatch.Managers {
         private List<CellView> _cellViews = new List<CellView>();
 
         private void Start() {
-            List<int> tempValues = new List<int> { 4,6,1,8,2,3,2,9,2, 1,1,8,5,5,1,5,6,4, 8,9,7,2,5,8,6,3,2 };
+            List<int> tempValues = new List<int> { 4,6,1,8,2,1,5,9,2, 1,1,8,5,5,1,5,6,4, 8,9,7,2,5,8,6,3,2 };
             _currentBoard = BoardData.CreateFromValues(tempValues, 1);
-            _currentBoard.AddsRemaining = 3; // Give some initial adds for testing
+            _currentBoard.AddsRemaining = 6; // Default Adds set to 6
+            
+            // Sync with UI initially
+            FindObjectOfType<UIController>()?.SetAddsRemaining(_currentBoard.AddsRemaining);
             
             if (_inputController != null) {
                 _inputController.Init(_currentBoard);
@@ -75,6 +78,18 @@ namespace NumMatch.Managers {
             }
         }
 
+        public void ScrollToTopPublic() {
+            ScrollToTop();
+        }
+
+        public void GenerateNewStage(int stage) {
+            _currentBoard.Cells.Clear();
+            var board = BoardGenerator.GenerateBoard(stage, 27);
+            _currentBoard.Cells.AddRange(board.Cells);
+            GemSpawner.SpawnGems(_currentBoard);
+            RenderBoard(_currentBoard);
+        }
+
         private void AnimateCellSpawn(CellView view, Vector2 targetPos, float delay) {
             var rt = view.GetComponent<RectTransform>();
             var cg = view.GetOrAddCanvasGroup();
@@ -90,14 +105,17 @@ namespace NumMatch.Managers {
             seq.Join(DOTween.To(() => cg.alpha, x => cg.alpha = x, 1f, 0.2f));
         }
 
+        /// <summary>Animation khi match thành công: pop nhẹ rồi mờ đi (KHÔNG xóa, chỉ dim).</summary>
         public void AnimateCellMatched(CellView view, Action onComplete = null) {
             var rt = view.GetComponent<RectTransform>();
             var cg = view.GetOrAddCanvasGroup();
             
             Sequence seq = DOTween.Sequence();
+            // Pop nhẹ rồi thu về kích thước gốc
             seq.Append(rt.DOScale(Vector3.one * 1.2f, 0.1f).SetEase(Ease.OutQuad));
-            seq.Append(rt.DOScale(Vector3.zero, 0.2f).SetEase(Ease.InBack));
-            seq.Join(DOTween.To(() => cg.alpha, x => cg.alpha = x, 0f, 0.2f));
+            seq.Append(rt.DOScale(Vector3.one, 0.1f).SetEase(Ease.InQuad));
+            // Fade xuống mờ (alpha 0.3) — cell và text vẫn hiện nhưng bị dim
+            seq.Join(DOTween.To(() => cg.alpha, x => cg.alpha = x, 0.3f, 0.15f));
             seq.OnComplete(() => onComplete?.Invoke());
         }
 
@@ -181,6 +199,9 @@ namespace NumMatch.Managers {
             _currentBoard.AppendCells(unmatchedValues);
             _currentBoard.AddsRemaining--;
             
+            // Sync up UI Controller here immediately after decrementing Add uses
+            FindObjectOfType<UIController>()?.SetAddsRemaining(_currentBoard.AddsRemaining);
+            
             for (int i = oldCount; i < _currentBoard.Cells.Count; i++) {
                 var cell = _currentBoard.Cells[i];
                 var view = Instantiate(_cellPrefab, _boardContainer);
@@ -211,16 +232,20 @@ namespace NumMatch.Managers {
             CellView viewA = GetCellView(a.Index);
             CellView viewB = GetCellView(b.Index);
             
+            // Dim animation cho 2 cell vừa match (chỉ mờ đi, KHÔNG xóa)
             int completed = 0;
             Action checkDone = () => {
                 completed++;
                 if (completed < 2) return;
                 
+                // Rebind để cập nhật trạng thái interactable
                 viewA.Bind(a);
                 viewB.Bind(b);
                 
+                // Sau khi dim xong, check xem có hàng nào đủ điều kiện clear không
                 CheckAndClearRows(() => {
-                    // CheckWinLose();
+                    var uiController = FindObjectOfType<UIController>();
+                    GameStateManager.Instance?.OnBoardStateChanged(_currentBoard, this, uiController);
                     if (_inputController != null) _inputController.SetInputEnabled(true);
                 });
             };
