@@ -45,6 +45,13 @@ namespace NumMatch.Managers
             }
         }
 
+        /// <summary>Trả về sprite tương ứng với GemType. Null nếu chưa gán.</summary>
+        public Sprite GetGemSprite(GemType type)
+        {
+            _gemSpriteDict.TryGetValue(type, out Sprite s);
+            return s;
+        }
+
         /// <summary>Cập nhật text Stage counter.</summary>
         public void SetStage(int stage)
         {

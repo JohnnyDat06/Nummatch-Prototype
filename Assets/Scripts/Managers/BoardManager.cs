@@ -23,15 +23,30 @@ namespace NumMatch.Managers {
 
         private BoardData _currentBoard;
         private List<CellView> _cellViews = new List<CellView>();
+        private UIController _uiController;
 
         private void Start() {
             List<int> tempValues = new List<int> { 4,6,1,8,2,1,5,9,2, 1,1,8,5,5,1,5,6,4, 8,9,7,2,5,8,6,3,2 };
             _currentBoard = BoardData.CreateFromValues(tempValues, 1);
-            _currentBoard.AddsRemaining = 6; // Default Adds set to 6
-            
-            // Sync with UI initially
-            FindObjectOfType<UIController>()?.SetAddsRemaining(_currentBoard.AddsRemaining);
-            
+            _currentBoard.AddsRemaining = 6;
+
+            // Mục tiêu gem: 3 màu Orange / Pink / Purple (khớp sprite bạn có)
+            _currentBoard.GemsNeeded = new Dictionary<GemType, int> {
+                { GemType.Orange, 2 },
+                { GemType.Pink,   2 },
+                { GemType.Purple, 2 }
+            };
+            _currentBoard.GemsCollected = new Dictionary<GemType, int> {
+                { GemType.Orange, 0 },
+                { GemType.Pink,   0 },
+                { GemType.Purple, 0 }
+            };
+
+            _uiController = FindObjectOfType<UIController>();
+            _uiController?.SetAddsRemaining(_currentBoard.AddsRemaining);
+            _uiController?.SetStage(_currentBoard.Stage);
+            _uiController?.InitGemCounters(_currentBoard.GemsNeeded);
+
             if (_inputController != null) {
                 _inputController.Init(_currentBoard);
                 _inputController.OnMatchSuccess += HandleMatchSuccess;
@@ -86,7 +101,11 @@ namespace NumMatch.Managers {
             _currentBoard.Cells.Clear();
             var board = BoardGenerator.GenerateBoard(stage, 27);
             _currentBoard.Cells.AddRange(board.Cells);
-            GemSpawner.SpawnGems(_currentBoard);
+            
+            // Generate list of all indices for initial spawn
+            List<int> newIndices = _currentBoard.Cells.Select(c => c.Index).ToList();
+            GemSpawner.SpawnGems(_currentBoard, newIndices);
+            
             RenderBoard(_currentBoard);
         }
 
@@ -160,6 +179,13 @@ namespace NumMatch.Managers {
             return null;
         }
 
+        /// <summary>Lấy Sprite gem tương ứng từ UIController; null nếu chưa gán.</summary>
+        private Sprite GetGemSpriteFor(Cell cell) {
+            if (!cell.IsGem || cell.GemColor == GemType.None) return null;
+            if (_uiController == null) _uiController = FindObjectOfType<UIController>();
+            return _uiController?.GetGemSprite(cell.GemColor);
+        }
+
         public void RenderBoard(BoardData data) {
             foreach (var v in _cellViews) {
                 if (v != null) {
@@ -176,7 +202,7 @@ namespace NumMatch.Managers {
                 rt.sizeDelta = new Vector2(_cellWidth, _cellHeight);
                 
                 Vector2 targetPos = CalcCellPosition(cell.Index);
-                view.Bind(cell);
+                view.Bind(cell, GetGemSpriteFor(cell));
                 _cellViews.Add(view);
                 _inputController?.RegisterCell(view);
                 
@@ -202,6 +228,13 @@ namespace NumMatch.Managers {
             // Sync up UI Controller here immediately after decrementing Add uses
             FindObjectOfType<UIController>()?.SetAddsRemaining(_currentBoard.AddsRemaining);
             
+            // Trigger GemSpawn cho cells mới BEFORE rendering them
+            List<int> appendedIndices = new List<int>();
+            for (int i = oldCount; i < _currentBoard.Cells.Count; i++) {
+                appendedIndices.Add(i);
+            }
+            GemSpawner.SpawnGems(_currentBoard, appendedIndices);
+            
             for (int i = oldCount; i < _currentBoard.Cells.Count; i++) {
                 var cell = _currentBoard.Cells[i];
                 var view = Instantiate(_cellPrefab, _boardContainer);
@@ -209,7 +242,7 @@ namespace NumMatch.Managers {
                 rt.sizeDelta = new Vector2(_cellWidth, _cellHeight);
                 
                 Vector2 targetPos = CalcCellPosition(cell.Index);
-                view.Bind(cell);
+                view.Bind(cell, GetGemSpriteFor(cell));
                 _cellViews.Add(view);
                 _inputController?.RegisterCell(view);
                 
@@ -219,8 +252,6 @@ namespace NumMatch.Managers {
             
             UpdateContentSize();
             DOVirtual.DelayedCall(0.1f, ScrollToBottom);
-            
-            // TODO: Trigger GemSpawn cho cells mới
         }
 
         private void HandleMatchSuccess(Cell a, Cell b) {
@@ -228,6 +259,10 @@ namespace NumMatch.Managers {
             
             a.IsMatched = true;
             b.IsMatched = true;
+            
+            // --- Thu thập gem nếu cell là gem ---
+            CollectGemIfAny(a);
+            CollectGemIfAny(b);
             
             CellView viewA = GetCellView(a.Index);
             CellView viewB = GetCellView(b.Index);
@@ -238,14 +273,13 @@ namespace NumMatch.Managers {
                 completed++;
                 if (completed < 2) return;
                 
-                // Rebind để cập nhật trạng thái interactable
-                viewA.Bind(a);
-                viewB.Bind(b);
+                // Rebind để cập nhật trạng thái interactable + gem overlay
+                viewA.Bind(a, GetGemSpriteFor(a));
+                viewB.Bind(b, GetGemSpriteFor(b));
                 
                 // Sau khi dim xong, check xem có hàng nào đủ điều kiện clear không
                 CheckAndClearRows(() => {
-                    var uiController = FindObjectOfType<UIController>();
-                    GameStateManager.Instance?.OnBoardStateChanged(_currentBoard, this, uiController);
+                    GameStateManager.Instance?.OnBoardStateChanged(_currentBoard, this, _uiController);
                     if (_inputController != null) _inputController.SetInputEnabled(true);
                 });
             };
@@ -253,6 +287,31 @@ namespace NumMatch.Managers {
             AudioManager.Instance?.Play(SfxType.PairClear);
             AnimateCellMatched(viewA, checkDone);
             AnimateCellMatched(viewB, checkDone);
+        }
+        
+        /// <summary>Nếu cell là gem và chưa thu đủ → cộng GemsCollected và cập nhật UI.</summary>
+        private void CollectGemIfAny(Cell cell) {
+            if (!cell.IsGem || cell.GemColor == GemType.None) return;
+            
+            GemType type = cell.GemColor;
+            
+            // Đảm bảo key tồn tại
+            if (!_currentBoard.GemsCollected.ContainsKey(type))
+                _currentBoard.GemsCollected[type] = 0;
+            if (!_currentBoard.GemsNeeded.ContainsKey(type)) return;
+            
+            int needed = _currentBoard.GemsNeeded[type];
+            int current = _currentBoard.GemsCollected[type];
+            
+            // Chỉ cộng nếu chưa đủ
+            if (current < needed) {
+                _currentBoard.GemsCollected[type] = current + 1;
+                // Cập nhật UI ngay lập tức
+                _uiController?.UpdateGemCounter(type, _currentBoard.GemsCollected[type], needed);
+            }
+            
+            // Đánh dấu gem đã được thu (tắt overlay)
+            cell.IsGem = false;
         }
 
         private void HandleMatchFailed(Cell a, Cell b) {
@@ -294,7 +353,8 @@ namespace NumMatch.Managers {
                         
                         // Rebind remaining cells explicitly
                         for (int i = 0; i < _cellViews.Count; i++) {
-                            _cellViews[i].Bind(_currentBoard.Cells[i]);
+                            var cell = _currentBoard.Cells[i];
+                            _cellViews[i].Bind(cell, GetGemSpriteFor(cell));
                         }
                         
                         AnimateShiftUp();
