@@ -184,11 +184,9 @@ namespace NumMatch.Tests
         [Test]
         public void GreedyCount_CellMatchable2Directions_CountsOnlyOnce()
         {
-            // Layout 1×9: [5, 5, 5, 1, 2, 3, 4, 6, 7]
-            // Cell[0]=5 có thể match Cell[1]=5 (liền kề ngang)
-            // Cell[1]=5 có thể match Cell[2]=5 (liền kề ngang)
-            // Greedy: match (0,1) → Cell[2] không còn pair → pairs = 1
-            var board = MakeBoard(new[] { 5, 5, 5, 1, 2, 3, 4, 6, 7 });
+            // Layout 1×9: [5, 5, 5, 1, 2, 3, 1, 2, 3]
+            // Greedy: match (0,1) → pairs = 1. Remaining 5 cannot match. 1, 2, 3 sequences don't have pairs.
+            var board = MakeBoard(new[] { 5, 5, 5, 1, 2, 3, 1, 2, 3 });
             int pairs = BoardGenerator.CountGreedyMatchablePairs(board);
             Assert.AreEqual(1, pairs, "3 số 5 liên tiếp phải tính là 1 cặp greedy, không phải 2");
         }
@@ -196,16 +194,15 @@ namespace NumMatch.Tests
         [Test]
         public void GreedyCount_CellA_MatchesB_And_C_CountsOnce()
         {
-            // Cell A vừa match được B (ngang) vừa match được C (dọc)
-            // Sau khi greedy chọn (A,B) → C không còn pair với A
-            // Tổng = 1 cặp, không phải 2
-            // Board 2×9:
-            // row0: [5, 5, 1, 2, 3, 4, 6, 7, 8]
-            // row1: [5, 9, 1, 2, 3, 4, 6, 7, 8]
-            // Cell[0]=5: match ngang Cell[1]=5, match dọc Cell[9]=5
+            // Board 2×9 - Using safe-color grid (2,3,4,5) to avoid any accidental sums to 10 or equals.
+            // row0: [1, 1, 4, 5, 2, 3, 4, 5, 2]
+            // row1: [1, 5, 2, 3, 4, 5, 2, 3, 4]
+            // Greedy: picks (0,1) with value 1. Row1Col0 is 1, but its potential pairs (0,0) and (0,1) are already used.
+            // The rest of the board is perfectly matched so it yields 0 additional pairs.
+            // Total = 1
             var board = MakeBoard(new[] {
-                5, 5, 1, 2, 3, 4, 6, 7, 8,
-                5, 9, 1, 2, 3, 4, 6, 7, 8
+                1, 1, 4, 5, 2, 3, 4, 5, 2,
+                1, 5, 2, 3, 4, 5, 2, 3, 4
             });
             int pairs = BoardGenerator.CountGreedyMatchablePairs(board);
             // Greedy chọn (0,1) → Cell[9] không còn match → tổng = 1
@@ -215,13 +212,15 @@ namespace NumMatch.Tests
         [Test]
         public void GreedyCount_TwoIndependentPairs_CountsTwo()
         {
-            // Xác nhận greedy vẫn đếm đúng khi có 2 cặp độc lập
-            // row0: [1, 1, 2, 3, 4, 5, 6, 7, 8]
-            // row1: [9, 9, 2, 3, 4, 5, 6, 7, 8]
-            // (0,1)=pair1 độc lập, (9,10)=pair2 độc lập
+            // Board 2x9 - Safe colored to avoid accidental connections.
+            // row0: [1, 1, 4, 5, 2, 3, 4, 9, 9]
+            // row1: [4, 5, 2, 3, 4, 5, 2, 3, 4]
+            // Pair 1: (0,1) = 1,1.   Pair 2: (7,8) = 9,9.
+            // 1 and 9 can sum to 10 horizontally but blocked by 4,5,2,3,4. 
+            // Rest of board gives 0 pairs. Total exactly 2.
             var board = MakeBoard(new[] {
-                1, 1, 2, 3, 4, 5, 6, 7, 8,
-                9, 9, 2, 3, 4, 5, 6, 7, 8
+                1, 1, 4, 5, 2, 3, 4, 9, 9,
+                4, 5, 2, 3, 4, 5, 2, 3, 4
             });
             int pairs = BoardGenerator.CountGreedyMatchablePairs(board);
             Assert.AreEqual(2, pairs, "2 cặp độc lập phải count đúng là 2");
