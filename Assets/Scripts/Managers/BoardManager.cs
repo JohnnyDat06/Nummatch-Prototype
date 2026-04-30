@@ -25,27 +25,11 @@ namespace NumMatch.Managers {
         private List<CellView> _cellViews = new List<CellView>();
         private UIController _uiController;
 
+        public BoardData CurrentBoard => _currentBoard;
+
         private void Start() {
-            List<int> tempValues = new List<int> { 4,6,1,8,2,1,5,9,2, 1,1,8,5,5,1,5,6,4, 8,9,7,2,5,8,6,3,2 };
-            _currentBoard = BoardData.CreateFromValues(tempValues, 1);
-            _currentBoard.AddsRemaining = 6;
-
-            // Mục tiêu gem: 3 màu Orange / Pink / Purple (khớp sprite bạn có)
-            _currentBoard.GemsNeeded = new Dictionary<GemType, int> {
-                { GemType.Orange, 2 },
-                { GemType.Pink,   2 },
-                { GemType.Purple, 2 }
-            };
-            _currentBoard.GemsCollected = new Dictionary<GemType, int> {
-                { GemType.Orange, 0 },
-                { GemType.Pink,   0 },
-                { GemType.Purple, 0 }
-            };
-
+            _currentBoard = BoardData.CreateEmpty(1);
             _uiController = FindObjectOfType<UIController>();
-            _uiController?.SetAddsRemaining(_currentBoard.AddsRemaining);
-            _uiController?.SetStage(_currentBoard.Stage);
-            _uiController?.InitGemCounters(_currentBoard.GemsNeeded);
 
             if (_inputController != null) {
                 _inputController.Init(_currentBoard);
@@ -53,7 +37,8 @@ namespace NumMatch.Managers {
                 _inputController.OnMatchFailed += HandleMatchFailed;
             }
 
-            RenderBoard(_currentBoard);
+            // Delegate initialization to GameStateManager
+            GameStateManager.Instance?.InitGame(_currentBoard, this, _uiController);
         }
 
         private void OnDestroy() {
@@ -76,7 +61,8 @@ namespace NumMatch.Managers {
             float contentHeight = _padding.y * 2 + totalRows * (_cellHeight + _spacingY) - _spacingY;
             var contentRT = _boardContainer.GetComponent<RectTransform>();
             if (contentRT != null) {
-                contentRT.sizeDelta = new Vector2(contentRT.sizeDelta.x, Mathf.Max(contentRT.sizeDelta.y, contentHeight));
+                // Bỏ Mathf.Max để content có thể co lại khi qua màn mới (nếu không ScrollToBottom sẽ trôi tuột xuống đáy rỗng)
+                contentRT.sizeDelta = new Vector2(contentRT.sizeDelta.x, contentHeight);
             }
         }
 
@@ -106,6 +92,9 @@ namespace NumMatch.Managers {
             List<int> newIndices = _currentBoard.Cells.Select(c => c.Index).ToList();
             GemSpawner.SpawnGems(_currentBoard, newIndices);
             
+            // Re-init InputController with updated board data
+            _inputController?.Init(_currentBoard);
+            
             RenderBoard(_currentBoard);
         }
 
@@ -130,10 +119,8 @@ namespace NumMatch.Managers {
             var cg = view.GetOrAddCanvasGroup();
             
             Sequence seq = DOTween.Sequence();
-            // Pop nhẹ rồi thu về kích thước gốc
             seq.Append(rt.DOScale(Vector3.one * 1.2f, 0.1f).SetEase(Ease.OutQuad));
             seq.Append(rt.DOScale(Vector3.one, 0.1f).SetEase(Ease.InQuad));
-            // Fade xuống mờ (alpha 0.3) — cell và text vẫn hiện nhưng bị dim
             seq.Join(DOTween.To(() => cg.alpha, x => cg.alpha = x, 0.3f, 0.15f));
             seq.OnComplete(() => onComplete?.Invoke());
         }
@@ -225,10 +212,9 @@ namespace NumMatch.Managers {
             _currentBoard.AppendCells(unmatchedValues);
             _currentBoard.AddsRemaining--;
             
-            // Sync up UI Controller here immediately after decrementing Add uses
-            FindObjectOfType<UIController>()?.SetAddsRemaining(_currentBoard.AddsRemaining);
+            _uiController?.SetAddsRemaining(_currentBoard.AddsRemaining);
             
-            // Trigger GemSpawn cho cells mới BEFORE rendering them
+            // Trigger GemSpawn BEFORE rendering
             List<int> appendedIndices = new List<int>();
             for (int i = oldCount; i < _currentBoard.Cells.Count; i++) {
                 appendedIndices.Add(i);
@@ -252,6 +238,9 @@ namespace NumMatch.Managers {
             
             UpdateContentSize();
             DOVirtual.DelayedCall(0.1f, ScrollToBottom);
+
+            // Check Lose sau mỗi lần Add
+            CheckLoseCondition();
         }
 
         private void HandleMatchSuccess(Cell a, Cell b) {
@@ -263,30 +252,46 @@ namespace NumMatch.Managers {
             // --- Thu thập gem nếu cell là gem ---
             CollectGemIfAny(a);
             CollectGemIfAny(b);
+
+            // --- Check Win ngay sau collect, TRƯỚC row clear ---
+            if (GameStateManager.Instance != null && GameStateManager.Instance.CheckWinCondition(_currentBoard)) {
+                CellView viewA = GetCellView(a.Index);
+                CellView viewB = GetCellView(b.Index);
+                AudioManager.Instance?.Play(SfxType.PairClear);
+                AnimateCellMatched(viewA, null);
+                AnimateCellMatched(viewB, () => {
+                    viewA?.Bind(a, GetGemSpriteFor(a));
+                    viewB?.Bind(b, GetGemSpriteFor(b));
+                    GameStateManager.Instance.HandleWin(_currentBoard, this, _uiController, _inputController);
+                });
+                return; // Không trigger stage transition
+            }
             
-            CellView viewA = GetCellView(a.Index);
-            CellView viewB = GetCellView(b.Index);
+            CellView vA = GetCellView(a.Index);
+            CellView vB = GetCellView(b.Index);
             
-            // Dim animation cho 2 cell vừa match (chỉ mờ đi, KHÔNG xóa)
+            // Dim animation cho 2 cell vừa match
             int completed = 0;
             Action checkDone = () => {
                 completed++;
                 if (completed < 2) return;
                 
-                // Rebind để cập nhật trạng thái interactable + gem overlay
-                viewA.Bind(a, GetGemSpriteFor(a));
-                viewB.Bind(b, GetGemSpriteFor(b));
+                vA.Bind(a, GetGemSpriteFor(a));
+                vB.Bind(b, GetGemSpriteFor(b));
                 
-                // Sau khi dim xong, check xem có hàng nào đủ điều kiện clear không
                 CheckAndClearRows(() => {
                     GameStateManager.Instance?.OnBoardStateChanged(_currentBoard, this, _uiController);
-                    if (_inputController != null) _inputController.SetInputEnabled(true);
+                    
+                    // Check Lose sau mỗi match
+                    if (!CheckLoseCondition()) {
+                        if (_inputController != null) _inputController.SetInputEnabled(true);
+                    }
                 });
             };
             
             AudioManager.Instance?.Play(SfxType.PairClear);
-            AnimateCellMatched(viewA, checkDone);
-            AnimateCellMatched(viewB, checkDone);
+            AnimateCellMatched(vA, checkDone);
+            AnimateCellMatched(vB, checkDone);
         }
         
         /// <summary>Nếu cell là gem và chưa thu đủ → cộng GemsCollected và cập nhật UI.</summary>
@@ -295,7 +300,6 @@ namespace NumMatch.Managers {
             
             GemType type = cell.GemColor;
             
-            // Đảm bảo key tồn tại
             if (!_currentBoard.GemsCollected.ContainsKey(type))
                 _currentBoard.GemsCollected[type] = 0;
             if (!_currentBoard.GemsNeeded.ContainsKey(type)) return;
@@ -303,10 +307,8 @@ namespace NumMatch.Managers {
             int needed = _currentBoard.GemsNeeded[type];
             int current = _currentBoard.GemsCollected[type];
             
-            // Chỉ cộng nếu chưa đủ
             if (current < needed) {
                 _currentBoard.GemsCollected[type] = current + 1;
-                // Cập nhật UI ngay lập tức
                 _uiController?.UpdateGemCounter(type, _currentBoard.GemsCollected[type], needed);
             }
             
@@ -314,8 +316,31 @@ namespace NumMatch.Managers {
             cell.IsGem = false;
         }
 
-        private void HandleMatchFailed(Cell a, Cell b) {
+        /// <summary>Check Lose condition. Return true nếu đã thua.</summary>
+        private bool CheckLoseCondition() {
+            if (GameStateManager.Instance == null) return false;
+            if (GameStateManager.Instance.CheckLoseCondition(_currentBoard)) {
+                GameStateManager.Instance.HandleLose(_currentBoard, this, _uiController, _inputController);
+                return true;
+            }
+            return false;
+        }
+
+        private void HandleMatchFailed(Cell a, Cell b, System.Collections.Generic.List<int> blockingCells) {
             Debug.Log($"Failed match: {a.Value} + {b.Value}");
+            
+            // Shake animation cho các ô đang cản đường
+            if (blockingCells != null && blockingCells.Count > 0) {
+                foreach (int idx in blockingCells) {
+                    CellView view = GetCellView(idx);
+                    if (view != null) {
+                        var rt = view.GetComponent<RectTransform>();
+                        rt.DOKill(true);
+                        // Rung lắc nhẹ theo chiều ngang để báo hiệu "ô này đang chắn đường"
+                        rt.DOShakeAnchorPos(0.4f, new Vector2(12f, 0f), 20, 90f, false, true);
+                    }
+                }
+            }
         }
 
         private void CheckAndClearRows(Action onComplete) {
@@ -338,8 +363,6 @@ namespace NumMatch.Managers {
                 AnimateRowClear(row, () => {
                     clearedCount++;
                     if (clearedCount >= rowsToClear.Count) {
-                        // All row animations completed, safely remove data
-                        // Since rowsToClear is descending (e.g. 5, 2), we can remove safely without index shift
                         foreach (int r in rowsToClear) {
                             int start = r * 9;
                             int end = Mathf.Min(start + 9, _cellViews.Count);
@@ -351,7 +374,7 @@ namespace NumMatch.Managers {
                             _currentBoard.RemoveRow(r);
                         }
                         
-                        // Rebind remaining cells explicitly
+                        // Rebind remaining cells với gem sprite
                         for (int i = 0; i < _cellViews.Count; i++) {
                             var cell = _currentBoard.Cells[i];
                             _cellViews[i].Bind(cell, GetGemSpriteFor(cell));

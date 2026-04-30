@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using DG.Tweening;
 using NumMatch.Core;
 using NumMatch.UI;
 
@@ -9,7 +10,7 @@ namespace NumMatch.Managers {
         private BoardData _currentBoard;
         
         public event Action<Cell, Cell> OnMatchSuccess; // để BoardManager xử lý remove
-        public event Action<Cell, Cell> OnMatchFailed;  // để SFX/animation feedback
+        public event Action<Cell, Cell, System.Collections.Generic.List<int>> OnMatchFailed;  // để SFX/animation feedback
 
         private bool _inputEnabled = true;
 
@@ -71,11 +72,35 @@ namespace NumMatch.Managers {
                 view.SetSelected(false);
                 _firstSelected = null;
             } else {
-                OnMatchFailed?.Invoke(a, b);
-                // Đổi lựa chọn sang ô mới click nếu match sai
-                _firstSelected.SetSelected(false);
-                _firstSelected = view;
-                view.SetSelected(true);
+                var blockingCells = new System.Collections.Generic.List<int>();
+                bool isValueMatch = _currentBoard != null && (a.Value == b.Value || a.Value + b.Value == 10);
+                
+                if (isValueMatch) {
+                    blockingCells = MatchValidator.GetBlockingCells(_currentBoard, a.Index, b.Index);
+                }
+                
+                OnMatchFailed?.Invoke(a, b, blockingCells);
+                
+                if (isValueMatch) {
+                    // Hiện select cho ô thứ 2, block input trong 0.4s chờ hiệu ứng shake, sau đó deselect cả hai
+                    view.SetSelected(true);
+                    
+                    var first = _firstSelected;
+                    var second = view;
+                    _firstSelected = null;
+                    _inputEnabled = false;
+                    
+                    DOVirtual.DelayedCall(0.4f, () => {
+                        if (first != null) first.SetSelected(false);
+                        if (second != null) second.SetSelected(false);
+                        _inputEnabled = true;
+                    });
+                } else {
+                    // Đổi lựa chọn sang ô mới click nếu giá trị hoàn toàn sai
+                    if (_firstSelected != null) _firstSelected.SetSelected(false);
+                    _firstSelected = view;
+                    view.SetSelected(true);
+                }
             }
         }
     }

@@ -21,6 +21,7 @@ namespace NumMatch.UI {
 
         private Cell _data;
         private CanvasGroup _canvasGroup;
+        private Color _defaultTextColor;
 
         // Màu mặc định cho từng GemType (dùng khi không có sprite)
         private static readonly Dictionary<GemType, Color> GemColors = new Dictionary<GemType, Color> {
@@ -40,14 +41,21 @@ namespace NumMatch.UI {
             if (_button != null) {
                 _button.onClick.AddListener(HandleClick);
             }
+            // Lưu màu text gốc (set trong Inspector) để restore khi cell không còn là gem
+            if (_valueText != null)
+                _defaultTextColor = _valueText.color;
         }
 
         /// <summary>Khởi tạo hiển thị của cell dựa trên data. Truyền gemSprite nếu có.</summary>
         public void Bind(Cell cell, Sprite gemSprite = null) {
             _data = cell;
 
-            // Luôn hiển thị số kể cả khi đã matched (dim)
+            // Luôn hiển thị số; nếu là gem → đổi màu chữ sang trắng để nổi trên overlay
             _valueText.text = cell.Value.ToString();
+            bool isGem = cell.IsGem && cell.GemColor != GemType.None;
+            _valueText.color = isGem ? Color.white : _defaultTextColor;
+            _valueText.gameObject.SetActive(true);
+
             SetSelected(false);
             SetInteractable(!cell.IsMatched);
             gameObject.SetActive(true);

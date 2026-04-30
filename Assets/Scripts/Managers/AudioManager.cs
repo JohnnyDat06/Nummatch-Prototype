@@ -7,7 +7,9 @@ namespace NumMatch.Managers {
         Choose,
         PairClear,
         RowClear,
-        PopButton
+        PopButton,
+        Win,
+        Lose
     }
 
     [Serializable]
