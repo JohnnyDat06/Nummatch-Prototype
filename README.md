@@ -19,6 +19,7 @@ Một công cụ (Editor Tool) được thiết kế riêng để giải quyết
 - **Thuật toán:** Sử dụng **IDDFS** kết hợp với **Memoization** (Transposition Table) và kỹ thuật biểu diễn trạng thái bằng **Bitmask (128-bit)**.
 - **Tối ưu cực độ (O(N)):** Thay thế thuật toán kiểm tra đường đi bằng kỹ thuật **Raycasting 4 hướng**, giảm thời gian duyệt từ O(N³) xuống O(N).
 - **Tốc độ (Benchmark):** Xử lý input chuỗi 99 ký tự để xuất ra top 10 lời giải tối ưu nhất với giới hạn thời gian (Timeout) chưa tới 1000ms.
+- **File đặc tả: ** Hard Mode Algorithm & Solver.
 
 ## 🛠 Tech Stack & Kiến trúc
 
