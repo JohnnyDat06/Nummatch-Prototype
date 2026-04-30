@@ -16,6 +16,12 @@ namespace NumMatch.Managers
         [Tooltip("Tên của scene menu (trang chủ)")]
         public string homeSceneName = "Home";
 
+        private void Awake()
+        {
+#if UNITY_STANDALONE_WIN && !UNITY_EDITOR
+            Screen.SetResolution(540, 960, FullScreenMode.Windowed);
+#endif
+        }
         /// <summary>
         /// Gọi hàm này từ sự kiện OnClick của nút Start ở scene Home.
         /// </summary>
